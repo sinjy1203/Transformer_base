@@ -1,1 +1,2 @@
-SPECIAL_TOKENS = ["<UNK>", "<PAD>", "<SOS>", "<EOS>"]
+SPECIAL_TOKENS = {"unknown": "<UNK>", "pad": "<PAD>", "start": "<SOS>", "end": "<EOS>"}
+MAX_SEQ_LEN = 256
