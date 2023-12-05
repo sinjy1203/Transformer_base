@@ -22,12 +22,16 @@ class MultiHeadAttention(nn.Module):
         vectors = vectors.view(-1, self.h, seq_len, self.d_head)
         return vectors
 
-    def forward(self, x):
-        q = self._get_multihead_vectors(x, self.weight_q)
-        k = self._get_multihead_vectors(x, self.weight_k)
-        v = self._get_multihead_vectors(x, self.weight_v)
+    def forward(self, query, key, value, mask):
+        q = self._get_multihead_vectors(query, self.weight_q)
+        k = self._get_multihead_vectors(key, self.weight_k)
+        v = self._get_multihead_vectors(value, self.weight_v)
 
-        attention_scores = torch.matmul(q, k.transpose(-2, -1)) / (self.d_head**0.5)
+        attention_scores = torch.matmul(q, k.transpose(-2, -1)) / (
+            self.d_head**0.5
+        )  # (batch_size, h, seq_len, seq_len)
+        attention_scores = attention_scores.masked_fill(mask == 0, -1e9)
+
         attention_dists = F.softmax(attention_scores, dim=-1)
         attention_values = torch.matmul(attention_dists, v)
 
