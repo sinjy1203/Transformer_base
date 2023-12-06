@@ -71,12 +71,42 @@ class EncoderLayer(nn.Module):
         self.dropout2 = nn.Dropout(p_drop)
         self.layer_norm2 = nn.LayerNorm(d_model)
 
-    def forward(self, x, mask):
-        x = x + self.dropout1(self.multihead_attention(x, x, x, mask))
+    def forward(self, x, attention_mask):
+        x = x + self.dropout1(self.multihead_attention(x, x, x, attention_mask))
         x = self.layer_norm1(x)
 
         x = x + self.dropout2(self.positionwise_feedforward(x))
         x = self.layer_norm2(x)
+        return x
+
+
+class DecoderLayer(nn.Module):
+    def __init__(self, d_model=512, h=8, d_ff=2048, p_drop=0.1):
+        super().__init__()
+
+        self.masked_multihead_attention = MultiHeadAttention(d_model, h)
+        self.dropout1 = nn.Dropout(p_drop)
+        self.layer_norm1 = nn.LayerNorm(d_model)
+
+        self.multihead_attention = MultiHeadAttention(d_model, h)
+        self.dropout2 = nn.Dropout(p_drop)
+        self.layer_norm2 = nn.LayerNorm(d_model)
+
+        self.positionwise_feedforward = PositionWiseFeedForward(d_model, d_ff)
+        self.dropout3 = nn.Dropout(p_drop)
+        self.layer_norm3 = nn.LayerNorm(d_model)
+
+    def forward(self, x, encoder_output, attention1_mask, attention2_mask):
+        x = x + self.dropout1(self.masked_multihead_attention(x, x, x, attention1_mask))
+        x = self.layer_norm1(x)
+
+        x = x + self.dropout2(
+            self.multihead_attention(x, encoder_output, encoder_output, attention2_mask)
+        )
+        x = self.layer_norm2(x)
+
+        x = x + self.dropout3(self.positionwise_feedforward(x))
+        x = self.layer_norm3(x)
         return x
 
 
@@ -89,7 +119,9 @@ if __name__ == "__main__":
 
     x = torch.randn(batch_size, seq_len, d_model)
 
-    model = EncoderLayer()
-    print(model(x, None).shape)
+    # model = EncoderLayer()
+    # print(model(x, None).shape)
+    model = DecoderLayer()
+    print(model(x, x, None, None).shape)
     # model = MultiHeadAttention(d_model=d_model, h=h)
     # print(model(x, x, x, None).shape)
