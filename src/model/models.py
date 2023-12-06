@@ -31,8 +31,7 @@ class MultiHeadAttention(nn.Module):
         attention_scores = torch.matmul(q, k.transpose(-2, -1)) / (
             self.d_head**0.5
         )  # (batch_size, h, seq_len, seq_len)
-        if mask:
-            attention_scores = attention_scores.masked_fill(mask == 0, -1e9)
+        attention_scores = attention_scores.masked_fill(mask == 0, -1e9)
 
         attention_dists = F.softmax(attention_scores, dim=-1)
         attention_values = torch.matmul(attention_dists, v)
@@ -110,6 +109,128 @@ class DecoderLayer(nn.Module):
         return x
 
 
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model=512, max_seq_len=256):
+        super().__init__()
+
+        self.encoding = torch.zeros(max_seq_len, d_model)
+        self.encoding.requires_grad = False
+
+        position = torch.arange(0, max_seq_len, dtype=torch.float).unsqueeze(1)
+        position.shape
+
+        _2i = torch.arange(0, d_model, step=2, dtype=torch.float)
+
+        self.encoding[:, 0::2] = torch.sin(position / (10000 ** (_2i / d_model)))
+        self.encoding[:, 1::2] = torch.cos(position / (10000 ** (_2i / d_model)))
+        self.encoding = self.encoding.unsqueeze(0)
+
+    def forward(self, x):
+        return x + self.encoding[:, : x.shape[1], :]
+
+
+class TokenEmbedding(nn.Module):
+    def __init__(self, vocab_size, d_model=512):
+        super().__init__()
+
+        self.embedding = nn.Embedding(vocab_size, d_model)
+        self.d_model = d_model
+
+    def forward(self, x):
+        x = self.embedding(x) * (self.d_model**0.5)
+        return x
+
+
+class Embedding(nn.Module):
+    def __init__(self, vocab_size, d_model=512, max_seq_len=256, p_drop=0.1):
+        super().__init__()
+
+        self.token_embedding = TokenEmbedding(vocab_size, d_model)
+        self.positional_encoding = PositionalEncoding(d_model, max_seq_len)
+        self.dropout = nn.Dropout(p_drop)
+
+    def forward(self, x):
+        x = self.token_embedding(x)
+        x = self.positional_encoding(x)
+        x = self.dropout(x)
+        return x
+
+
+class Encoder(nn.Module):
+    def __init__(self, d_model=512, h=8, d_ff=2048, p_drop=0.1, N=6):
+        super().__init__()
+        self.layers = nn.ModuleList(
+            [EncoderLayer(d_model, h, d_ff, p_drop) for _ in range(N)]
+        )
+
+    def forward(self, x, attention_mask):
+        for layer in self.layers:
+            x = layer(x, attention_mask)
+        return x
+
+
+class Decoder(nn.Module):
+    def __init__(self, d_model=512, h=8, d_ff=2048, p_drop=0.1, N=6):
+        super().__init__()
+        self.layers = nn.ModuleList(
+            [DecoderLayer(d_model, h, d_ff, p_drop) for _ in range(N)]
+        )
+
+    def forward(self, x, encoder_output, attention1_mask, attention2_mask):
+        for layer in self.layers:
+            x = layer(x, encoder_output, attention1_mask, attention2_mask)
+        return x
+
+
+class Transformer(nn.Module):
+    def __init__(
+        self, vocab_size, d_model=512, max_seq_len=256, h=8, d_ff=2048, p_drop=0.1, N=6
+    ):
+        super().__init__()
+        self.embedding = Embedding(vocab_size, d_model, max_seq_len, p_drop)
+        self.encoder = Encoder(d_model, h, d_ff, p_drop, N)
+        self.decoder = Decoder(d_model, h, d_ff, p_drop, N)
+        self.linear = nn.Linear(d_model, vocab_size)
+
+    def forward(self, src, tgt):
+        encoder_attention_mask = self.pad_mask(src, src)
+        decoder_attention1_mask = self.pad_mask(tgt, tgt) & self.subsequent_mask(
+            tgt, tgt
+        )
+        decoder_attention2_mask = self.pad_mask(tgt, src)
+
+        encoder_output = self.encoder(self.embedding(src), encoder_attention_mask)
+        decoder_output = self.decoder(
+            self.embedding(tgt),
+            encoder_output,
+            decoder_attention1_mask,
+            decoder_attention2_mask,
+        )
+
+        output = F.softmax(self.linear(decoder_output))
+        return output
+
+    def pad_mask(self, q, k, pad_idx=1):
+        q_seq_len, k_seq_len = q.shape[1], k.shape[1]
+
+        q_mask = q.ne(pad_idx)[:, None, :, None]
+        q_mask = q_mask.repeat(1, 1, 1, k_seq_len)
+
+        k_mask = k.ne(pad_idx)[:, None, None, :]
+        k_mask = k_mask.repeat(1, 1, q_seq_len, 1)
+
+        mask = q_mask & k_mask
+        mask.requires_grad = False
+        return mask
+
+    def subsequent_mask(self, q, k):
+        q_seq_len, k_seq_len = q.shape[1], k.shape[1]
+
+        mask = torch.tril(torch.ones(q_seq_len, k_seq_len)).type(torch.bool)
+        mask.requires_grad = False
+        return mask
+
+
 if __name__ == "__main__":
     batch_size = 8
     seq_len = 256
@@ -121,7 +242,9 @@ if __name__ == "__main__":
 
     # model = EncoderLayer()
     # print(model(x, None).shape)
-    model = DecoderLayer()
-    print(model(x, x, None, None).shape)
+    # model = DecoderLayer()
+    # print(model(x, x, None, None).shape)
     # model = MultiHeadAttention(d_model=d_model, h=h)
     # print(model(x, x, x, None).shape)
+    model = Transformer(vocab_size=36550)
+    print(model(x, x).shape)
