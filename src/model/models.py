@@ -110,7 +110,7 @@ class DecoderLayer(nn.Module):
 
 
 class PositionalEncoding(nn.Module):
-    def __init__(self, d_model=512, max_seq_len=256):
+    def __init__(self, d_model=512, max_seq_len=256, device=torch.device("cuda")):
         super().__init__()
 
         self.encoding = torch.zeros(max_seq_len, d_model)
@@ -123,7 +123,7 @@ class PositionalEncoding(nn.Module):
 
         self.encoding[:, 0::2] = torch.sin(position / (10000 ** (_2i / d_model)))
         self.encoding[:, 1::2] = torch.cos(position / (10000 ** (_2i / d_model)))
-        self.encoding = self.encoding.unsqueeze(0)
+        self.encoding = self.encoding.unsqueeze(0).to(device)
 
     def forward(self, x):
         return x + self.encoding[:, : x.shape[1], :]
@@ -142,11 +142,20 @@ class TokenEmbedding(nn.Module):
 
 
 class Embedding(nn.Module):
-    def __init__(self, vocab_size, d_model=512, max_seq_len=256, p_drop=0.1):
+    def __init__(
+        self,
+        vocab_size,
+        d_model=512,
+        max_seq_len=256,
+        p_drop=0.1,
+        device=torch.device("cuda"),
+    ):
         super().__init__()
 
         self.token_embedding = TokenEmbedding(vocab_size, d_model)
-        self.positional_encoding = PositionalEncoding(d_model, max_seq_len)
+        self.positional_encoding = PositionalEncoding(
+            d_model, max_seq_len, device=device
+        )
         self.dropout = nn.Dropout(p_drop)
 
     def forward(self, x):
@@ -184,10 +193,20 @@ class Decoder(nn.Module):
 
 class Transformer(nn.Module):
     def __init__(
-        self, vocab_size, d_model=512, max_seq_len=256, h=8, d_ff=2048, p_drop=0.1, N=6
+        self,
+        vocab_size,
+        d_model=512,
+        max_seq_len=256,
+        h=8,
+        d_ff=2048,
+        p_drop=0.1,
+        N=6,
+        device=torch.device("cuda"),
     ):
         super().__init__()
-        self.embedding = Embedding(vocab_size, d_model, max_seq_len, p_drop)
+        self.embedding = Embedding(
+            vocab_size, d_model, max_seq_len, p_drop, device=device
+        )
         self.encoder = Encoder(d_model, h, d_ff, p_drop, N)
         self.decoder = Decoder(d_model, h, d_ff, p_drop, N)
         self.linear = nn.Linear(d_model, vocab_size)
@@ -226,7 +245,9 @@ class Transformer(nn.Module):
     def subsequent_mask(self, q, k):
         q_seq_len, k_seq_len = q.shape[1], k.shape[1]
 
-        mask = torch.tril(torch.ones(q_seq_len, k_seq_len)).type(torch.bool)
+        mask = (
+            torch.tril(torch.ones(q_seq_len, k_seq_len)).type(torch.bool).to(q.device)
+        )
         mask.requires_grad = False
         return mask
 

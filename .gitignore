@@ -3,3 +3,4 @@ notebooks/test.ipynb
 *.pyc
 
 .vscode/
+wandb/
