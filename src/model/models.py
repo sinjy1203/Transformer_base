@@ -171,10 +171,12 @@ class Encoder(nn.Module):
         self.layers = nn.ModuleList(
             [EncoderLayer(d_model, h, d_ff, p_drop) for _ in range(N)]
         )
+        self.layer_norm = nn.LayerNorm(d_model)
 
     def forward(self, x, attention_mask):
         for layer in self.layers:
             x = layer(x, attention_mask)
+        x = self.layer_norm(x)
         return x
 
 
@@ -184,17 +186,20 @@ class Decoder(nn.Module):
         self.layers = nn.ModuleList(
             [DecoderLayer(d_model, h, d_ff, p_drop) for _ in range(N)]
         )
+        self.layer_norm = nn.LayerNorm(d_model)
 
     def forward(self, x, encoder_output, attention1_mask, attention2_mask):
         for layer in self.layers:
             x = layer(x, encoder_output, attention1_mask, attention2_mask)
+        x = self.layer_norm(x)
         return x
 
 
 class Transformer(nn.Module):
     def __init__(
         self,
-        vocab_size,
+        vocab_de_size,
+        vocab_en_size,
         d_model=512,
         max_seq_len=256,
         h=8,
@@ -204,12 +209,15 @@ class Transformer(nn.Module):
         device=torch.device("cuda"),
     ):
         super().__init__()
-        self.embedding = Embedding(
-            vocab_size, d_model, max_seq_len, p_drop, device=device
+        self.embedding_src = Embedding(
+            vocab_de_size, d_model, max_seq_len, p_drop, device=device
+        )
+        self.embedding_tgt = Embedding(
+            vocab_en_size, d_model, max_seq_len, p_drop, device=device
         )
         self.encoder = Encoder(d_model, h, d_ff, p_drop, N)
         self.decoder = Decoder(d_model, h, d_ff, p_drop, N)
-        self.linear = nn.Linear(d_model, vocab_size)
+        self.linear = nn.Linear(d_model, vocab_en_size)
 
     def forward(self, src, tgt):
         encoder_attention_mask = self.pad_mask(src, src)
@@ -218,9 +226,9 @@ class Transformer(nn.Module):
         )
         decoder_attention2_mask = self.pad_mask(tgt, src)
 
-        encoder_output = self.encoder(self.embedding(src), encoder_attention_mask)
+        encoder_output = self.encoder(self.embedding_src(src), encoder_attention_mask)
         decoder_output = self.decoder(
-            self.embedding(tgt),
+            self.embedding_tgt(tgt),
             encoder_output,
             decoder_attention1_mask,
             decoder_attention2_mask,

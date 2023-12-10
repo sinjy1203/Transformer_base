@@ -26,5 +26,5 @@ class TranslationLoss(nn.Module):
         )
 
     def forward(self, logits, tgt):
-        loss = self.loss_fn(logits.reshape(-1, self.vocab_size), tgt.reshape(-1))
+        loss = self.loss_fn(logits.reshape(-1, self.vocab_size), tgt.reshape(-1).long())
         return loss

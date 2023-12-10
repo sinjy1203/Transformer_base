@@ -1,3 +1,4 @@
+import warnings
 from torchtext import transforms
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger
@@ -10,52 +11,52 @@ import pyrootutils
 
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 from src.model.lightning_modules import TransformerModule
-from src.data.datamodules import EnDeDataModule
-from src.data.utils import get_vocab
+from src.data.datamodules import Multi30kDataModule
+from src.data.utils import VocabTransform, Tokenizer
 from extras.paths import *
 from extras.constants import *
 
+warnings.filterwarnings("ignore")
+
 
 def main():
-    vocab_en_de = get_vocab()
-    transform = transforms.Sequential(
-        transforms.VocabTransform(vocab_en_de),
-        transforms.Truncate(max_seq_len=MAX_SEQ_LEN - 2),
-        transforms.AddToken(
-            token=vocab_en_de.__getitem__(SPECIAL_TOKENS["start"]), begin=True
-        ),
-        transforms.AddToken(
-            token=vocab_en_de.__getitem__(SPECIAL_TOKENS["end"]), begin=False
-        ),
-        transforms.ToTensor(),
-        transforms.PadTransform(
-            max_length=MAX_SEQ_LEN,
-            pad_value=vocab_en_de.__getitem__(SPECIAL_TOKENS["pad"]),
-        ),
+    transform_common = [
+        transforms.AddToken(token=SPECIAL_TOKENS_IDX["SOS"], begin=True),
+        transforms.AddToken(token=SPECIAL_TOKENS_IDX["EOS"], begin=False),
+    ]
+    vocab_de = VocabTransform(VOCAB_DE_PATH, language="de")
+    vocab_en = VocabTransform(VOCAB_EN_PATH, language="en")
+
+    transform_de = transforms.Sequential(
+        *([Tokenizer(language="de"), vocab_de] + transform_common)
     )
-    dm = EnDeDataModule(
-        train_en_path=TRAIN_EN_PATH,
-        train_de_path=TRAIN_DE_PATH,
-        test_en_path=TEST_EN_PATH,
-        test_de_path=TEST_DE_PATH,
-        train_ratio=0.8,
+    transform_en = transforms.Sequential(
+        *([Tokenizer(language="en"), vocab_en] + transform_common)
+    )
+
+    dm = Multi30kDataModule(
         batch_size=32,
         num_workers=4,
-        transform=transform,
+        src_transform=transform_de,
+        tgt_transform=transform_en,
     )
-    dm.setup()
+    dm.setup(stage="fit")
 
     module = TransformerModule(
-        vocab_size=len(vocab_en_de),
-        pad_idx=vocab_en_de.__getitem__(SPECIAL_TOKENS["pad"]),
-        warmup_steps=6000,
+        vocab_de_size=len(vocab_de),
+        vocab_en_size=len(vocab_en),
+        pad_idx=SPECIAL_TOKENS_IDX["PAD"],
+        warmup_steps=10000,
         label_smoothing=0.1,
-        d_model=512,
-        max_seq_len=256,
+        d_model=128,
+        max_seq_len=5000,
         h=8,
-        d_ff=2048,
-        p_drop=0.1,
-        N=6,
+        d_ff=512,
+        p_drop=0.3,
+        N=2,
+        betas=(0.9, 0.98),
+        eps=1e-9,
+        device="cuda",
     )
     logger = WandbLogger(project="Transformer-Base", entity="sinjy1203")
     callbacks = [
@@ -70,10 +71,10 @@ def main():
         ),
     ]
 
-    trainer = Trainer(max_steps=1000000, logger=logger, callbacks=callbacks, devices=1)
+    trainer = Trainer(max_epochs=20, logger=logger, callbacks=callbacks, devices=1)
     trainer.fit(module, dm)
 
-    trainer.test(datamodule=dm)
+    # trainer.test(datamodule=dm)
 
 
 if __name__ == "__main__":

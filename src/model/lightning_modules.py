@@ -12,7 +12,8 @@ from src.model.utils import LearningRateWarmupScheduler, TranslationLoss
 class TransformerModule(pl.LightningModule):
     def __init__(
         self,
-        vocab_size,
+        vocab_de_size,
+        vocab_en_size,
         pad_idx,
         warmup_steps=4000,
         label_smoothing=0.1,
@@ -31,7 +32,8 @@ class TransformerModule(pl.LightningModule):
         self.save_hyperparameters()
 
         self.model = Transformer(
-            vocab_size,
+            vocab_de_size,
+            vocab_en_size,
             d_model,
             max_seq_len,
             h,
@@ -40,7 +42,7 @@ class TransformerModule(pl.LightningModule):
             N,
             device=torch.device(device),
         )
-        self.loss_fn = TranslationLoss(pad_idx, vocab_size, label_smoothing)
+        self.loss_fn = TranslationLoss(pad_idx, vocab_en_size, label_smoothing)
 
     def forward(self, src, tgt):
         return self.model(src, tgt)
