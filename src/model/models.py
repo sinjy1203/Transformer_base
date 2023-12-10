@@ -234,7 +234,7 @@ class Transformer(nn.Module):
             decoder_attention2_mask,
         )
 
-        output = F.softmax(self.linear(decoder_output))
+        output = self.linear(decoder_output)
         return output
 
     def pad_mask(self, q, k, pad_idx=1):

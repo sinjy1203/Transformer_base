@@ -1,4 +1,6 @@
 import warnings
+import wandb
+import torch
 from torchtext import transforms
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger
@@ -20,18 +22,18 @@ warnings.filterwarnings("ignore")
 
 
 def main():
-    transform_common = [
-        transforms.AddToken(token=SPECIAL_TOKENS_IDX["SOS"], begin=True),
-        transforms.AddToken(token=SPECIAL_TOKENS_IDX["EOS"], begin=False),
-    ]
     vocab_de = VocabTransform(VOCAB_DE_PATH, language="de")
     vocab_en = VocabTransform(VOCAB_EN_PATH, language="en")
 
-    transform_de = transforms.Sequential(
-        *([Tokenizer(language="de"), vocab_de] + transform_common)
-    )
+    transform_de = transforms.Sequential(*[Tokenizer(language="de"), vocab_de])
     transform_en = transforms.Sequential(
-        *([Tokenizer(language="en"), vocab_en] + transform_common)
+        *(
+            [Tokenizer(language="en"), vocab_en]
+            + [
+                transforms.AddToken(token=SPECIAL_TOKENS_IDX["SOS"], begin=True),
+                transforms.AddToken(token=SPECIAL_TOKENS_IDX["EOS"], begin=False),
+            ]
+        )
     )
 
     dm = Multi30kDataModule(
@@ -75,6 +77,7 @@ def main():
     trainer.fit(module, dm)
 
     # trainer.test(datamodule=dm)
+    wandb.finish()
 
 
 if __name__ == "__main__":
