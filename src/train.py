@@ -64,6 +64,7 @@ def main(cfg: DictConfig):
             filename="Transformer-Base-{epoch:02d}-{val_loss:.4f}",
             save_top_k=5,
             mode="min",
+            save_weights_only=True,
         ),
     ]
 

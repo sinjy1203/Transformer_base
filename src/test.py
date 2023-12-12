@@ -2,6 +2,7 @@ import warnings
 from tqdm import tqdm
 import hydra
 from omegaconf import DictConfig, OmegaConf
+import torch
 from torchtext import transforms
 from torchtext.data.metrics import bleu_score
 import pyrootutils
@@ -39,8 +40,17 @@ def main(cfg: DictConfig):
     )
     dm.setup(stage="test")
 
-    ckpt_paths = [ckpt_path for ckpt_path in CKPT_DIR.iterdir()]
-    module = TransformerModule.load_from_checkpoint(ckpt_paths[-1])
+    module = TransformerModule(
+        vocab_de_size=len(vocab_de),
+        vocab_en_size=len(vocab_en),
+        vocab_de_idx2token=vocab_de.idx2token,
+        vocab_en_idx2token=vocab_en.idx2token,
+        pad_idx=SPECIAL_TOKENS_IDX["PAD"],
+        device="cuda",
+        **cfg.model
+    ).to(torch.device("cuda"))
+
+    module.load_average_ckpt(CKPT_DIR)
 
     outputs = []
     targets = []

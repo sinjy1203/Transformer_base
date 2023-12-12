@@ -163,3 +163,15 @@ class TransformerModule(pl.LightningModule):
             "frequency": 1,
         }
         return [optimizer], [scheduler]
+
+    def load_average_ckpt(self, ckpt_dir):
+        ckpt_paths = [ckpt_path for ckpt_path in ckpt_dir.iterdir()]
+        model_weights = [torch.load(path)["state_dict"] for path in ckpt_paths]
+        length = len(model_weights)
+
+        for key in model_weights[0]:
+            model_weights[0][key] = model_weights[0][key] / length
+            for i in range(1, length):
+                model_weights[0][key] += model_weights[i][key] / length
+
+        self.load_state_dict(model_weights[0])
