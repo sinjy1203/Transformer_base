@@ -36,6 +36,7 @@ class VocabTransform(Module):
     def __init__(self, vocab_path, language):
         self.vocab = VocabTransform.load_vocab(vocab_path, language)
         self.lookup = {token: i for i, token in enumerate(self.vocab)}
+        self.idx2token = {i: token for i, token in enumerate(self.vocab)}
 
     def __len__(self):
         return len(self.vocab)

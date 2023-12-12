@@ -33,7 +33,12 @@ from extras.constants import *
 class Multi30kDataset(Dataset):
     def __init__(self, split, src_transform=None, tgt_transform=None):
         dataset = Multi30k(split=split, language_pair=("de", "en"))
-        self.src_texts, self.tgt_texts = list(zip(*dataset))
+        src_texts, tgt_texts = list(zip(*dataset))
+        self.src_texts, self.tgt_texts = [], []
+        for i in range(len(src_texts)):
+            if src_texts[i] and tgt_texts[i]:
+                self.src_texts.append(src_texts[i])
+                self.tgt_texts.append(tgt_texts[i])
 
         self.src_transform = src_transform
         self.tgt_transform = tgt_transform

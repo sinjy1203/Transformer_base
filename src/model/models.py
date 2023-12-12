@@ -31,7 +31,8 @@ class MultiHeadAttention(nn.Module):
         attention_scores = torch.matmul(q, k.transpose(-2, -1)) / (
             self.d_head**0.5
         )  # (batch_size, h, seq_len, seq_len)
-        attention_scores = attention_scores.masked_fill(mask == 0, -1e9)
+        if mask is not None:
+            attention_scores = attention_scores.masked_fill(mask == 0, -1e9)
 
         attention_dists = F.softmax(attention_scores, dim=-1)
         attention_values = torch.matmul(attention_dists, v)
@@ -70,7 +71,7 @@ class EncoderLayer(nn.Module):
         self.dropout2 = nn.Dropout(p_drop)
         self.layer_norm2 = nn.LayerNorm(d_model)
 
-    def forward(self, x, attention_mask):
+    def forward(self, x, attention_mask=None):
         x = x + self.dropout1(self.multihead_attention(x, x, x, attention_mask))
         x = self.layer_norm1(x)
 
@@ -95,7 +96,7 @@ class DecoderLayer(nn.Module):
         self.dropout3 = nn.Dropout(p_drop)
         self.layer_norm3 = nn.LayerNorm(d_model)
 
-    def forward(self, x, encoder_output, attention1_mask, attention2_mask):
+    def forward(self, x, encoder_output, attention1_mask=None, attention2_mask=None):
         x = x + self.dropout1(self.masked_multihead_attention(x, x, x, attention1_mask))
         x = self.layer_norm1(x)
 
@@ -173,7 +174,7 @@ class Encoder(nn.Module):
         )
         self.layer_norm = nn.LayerNorm(d_model)
 
-    def forward(self, x, attention_mask):
+    def forward(self, x, attention_mask=None):
         for layer in self.layers:
             x = layer(x, attention_mask)
         x = self.layer_norm(x)
@@ -188,7 +189,7 @@ class Decoder(nn.Module):
         )
         self.layer_norm = nn.LayerNorm(d_model)
 
-    def forward(self, x, encoder_output, attention1_mask, attention2_mask):
+    def forward(self, x, encoder_output, attention1_mask=None, attention2_mask=None):
         for layer in self.layers:
             x = layer(x, encoder_output, attention1_mask, attention2_mask)
         x = self.layer_norm(x)

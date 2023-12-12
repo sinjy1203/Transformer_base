@@ -49,7 +49,7 @@ class Multi30kDataModule(pl.LightningDataModule):
 
         if stage == "test" or stage is None:
             self.test_dataset = Multi30kDataset(
-                split="test",
+                split="valid",
                 src_transform=self.src_transform,
                 tgt_transform=self.tgt_transform,
             )
@@ -77,11 +77,12 @@ class Multi30kDataModule(pl.LightningDataModule):
     def test_dataloader(self):
         return DataLoader(
             self.test_dataset,
-            batch_size=self.batch_size,
+            batch_size=1,
             shuffle=False,
             num_workers=self.num_workers,
             pin_memory=True,
             collate_fn=self.collate_fn,
+            drop_last=True,
         )
 
 

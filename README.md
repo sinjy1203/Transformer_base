@@ -16,3 +16,9 @@
 - paper: `Massive Exploration of Neural Machine Translation
 Architectures`
 - docs: `https://google.github.io/seq2seq/nmt/`
+
+### Inference
+- beam search의 score 계산을 위해 softmax를 통해 확률 분포 예측
+    => 이때 log_softmax를 사용
+    => 각 time에서 예측 분포의 확률 곱을 sum으로 바꾸기 위해 사용
+    
