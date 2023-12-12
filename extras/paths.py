@@ -16,3 +16,5 @@ from pathlib import Path
 DATA_DIR = Path("/media/shin/T7/nmt_data/multi30k")
 VOCAB_EN_PATH = DATA_DIR / "vocab_en.txt"
 VOCAB_DE_PATH = DATA_DIR / "vocab_de.txt"
+
+CKPT_DIR = Path("./checkpoints")
